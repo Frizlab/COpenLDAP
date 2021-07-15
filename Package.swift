@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
 	name: "COpenLDAP",
 	platforms: [
-		.macOS(.v11) /* Actually .v12 */
+		.macOS(.v12)
 	],
 	products: [
 		.executable(name: "build-openldap-framework", targets: ["build-framework"])
