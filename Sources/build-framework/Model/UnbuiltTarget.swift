@@ -4,6 +4,37 @@ import System
 import Logging
 
 
+// Replace "<openssl/" with "<COpenSSL/"
+// Patch libraries/liblutil/Makefile.in: Remove detach.* from UNIX_OBJS and UNIX_SRCS
+//    -> This is because it uses fork which is not available on iOS and other mobile OSes
+//       (fork is only used for the server code which we do not care about.)
+//
+// XCT_DEV_DIR=`/usr/bin/xcode-select -print-path`
+// XCT_SDKs_LOCATION=$XCT_DEV_DIR/Platforms/${target.platformLegacyName}.platform/Developer
+// XCT_SDK=${target.platformLegacyName}${sdk_version}.sdk
+// XCT_OPENSSL_FRAMEWORK_PATH=.../openssl-workdir-1.1.1k/COpenSSL-dynamic.xcframework/macos-arm64_x86_64
+// XCT_COMMON_FLAGS="-isysroot $XCT_SDKs_LOCATION/SDKs/$XCT_SDK -fno-common -fPIC -F$XCT_OPENSSL_FRAMEWORK_PATH"
+//   -fno-common -> idk what that is, but from what I gather it’s related to the fact we want static libs convertible to dylibs
+//
+// export CPPFLAGS="$XCT_COMMON_FLAGS -fembed-bitcode"
+// export LDFLAGS="$XCT_COMMON_FLAGS -framework COpenSSL -Wl,-rpath -Wl,$XCT_OPENSSL_FRAMEWORK_PATH"
+// ./configure --prefix=".../openldap-workdir-2.5.5/build/step2.installs/macOS-macOS-arm64"
+// make depend && make -C libraries && make -C libraries install
+//
+// TODO: Min SDK options (trivial from OpenSSL confs)
+//
+// Bitcode seems to only appear in .a products for whatever reason, but we don’t care, we rebuild the dylib from the .a
+//
+// To compile for $ARCH
+//   - Add "-arch $ARCH" to XCT_COMMON_FLAGS
+//   - Add "--host $HOST --with-yielding_select=yes" to configure
+//   - Hosts (note I’m not 100% certain of this list, e.g. what version of darwin should be used, etc.):
+//        - macOS-x86_64:      x86_64-apple-darwin21.0.0
+//        - macOS-arm64:      aarch64-apple-darwin21.0.0
+//        - watchOS-arm64_32:     arm-apple-darwin21.0.0
+//
+// Untested and not very useful because we rebuild dylibs from static ones, but should work:
+//   install_name_tool -delete_rpath $XCT_OPENSSL_FRAMEWORK_PATH $LIB.dylib
 
 struct UnbuiltTarget {
 	
