@@ -11,7 +11,7 @@ enum Config {
 	
 	@TaskLocal
 	static var logger: Logger = { () -> Logger in
-		var ret = Logger(label: "com.xcode-actions.build-openssl")
+		var ret = Logger(label: "com.xcode-actions.build-openldap")
 		ret.logLevel = .debug
 		return ret
 	}()

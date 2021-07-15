@@ -12,24 +12,30 @@ import XibLoc
 @main
 struct BuildFramework : ParsableCommand {
 	
-	@Option(help: "The path to the “Files” directory, containing some resources to build OpenSSL.")
+	@Option(help: "The path to the “Files” directory, containing some resources to build OpenLDAP.")
 	var filesPath = Self.defaultFilesFolderURL.path
 	
 	@Option(help: "Everything build-framework will create will be in this folder, except the final xcframeworks. The folder will be created if it does not exist.")
-	var workdir = "./openssl-workdir"
+	var workdir = "./openldap-workdir"
 	
 	@Option(help: "The final xcframeworks will be in this folder. If unset, will be equal to the work dir. The folder will be created if it does not exist.")
 	var resultdir: String?
 	
-	@Option(help: "The base URL from which to download OpenSSL. Everything between double curly braces “{{}}” will be replaced by the OpenSSL version to build.")
-	var opensslBaseURL = "https://www.openssl.org/source/openssl-{{ version }}.tar.gz"
+	@Option(help: "The base URL from which to download OpenLDAP. Everything between double curly braces “{{}}” will be replaced by the OpenLDAP version to build.")
+	var openldapBaseURL = "https://www.openldap.org/software/download/OpenLDAP/openldap-release/openldap-{{ version }}.tgz"
 	
 	@Option
-	var opensslVersion = "1.1.1k"
+	var openldapVersion = "2.5.5"
 	
-	/* For 1.1.1k, value is 892a0875b9872acd04a9fde79b1f943075d5ea162415de3047c327df33fbaee5 */
+	/* For 2.5.5, value is 74ecefda2afc0e054d2c7dc29166be6587fa9de7a4087a80183bc9c719dbf6b3 */
 	@Option(help: "The shasum-256 expected for the tarball. If not set, the integrity of the archive will not be verified.")
 	var expectedTarballShasum: String?
+	
+	@Option(name: .customLong("openssl-xcframework-url"), help: "The URL to the OpenSSL dynamic XCFramework archive. The URL scheme can be file, http or https. A file URL can either point to an XCFramework archive or an XCFramework directly.")
+	var opensslXCFrameworkURL: URL
+	
+	@Option(name: .customLong("expected-openssl-xcframework-shasum"), help: "The shasum-256 expected for the OpenSSL XCFramework archive.")
+	var expectedOpenSSLXCFrameworkShasum: String?
 	
 	@Flag
 	var disableBitcode = false
@@ -101,7 +107,7 @@ struct BuildFramework : ParsableCommand {
 		LoggingSystem.bootstrap{ _ in CLTLogger() }
 		XcodeTools.XcodeToolsConfig.logger?.logLevel = .warning
 		
-		let buildPaths = try BuildPaths(filesPath: FilePath(filesPath), workdir: FilePath(workdir), resultdir: resultdir.flatMap{ FilePath($0) }, productName: "COpenSSL")
+		let buildPaths = try BuildPaths(filesPath: FilePath(filesPath), workdir: FilePath(workdir), resultdir: resultdir.flatMap{ FilePath($0) }, productName: "COpenLDAP")
 		
 		if clean {
 			Config.logger.info("Cleaning previous builds if applicable")
@@ -109,7 +115,7 @@ struct BuildFramework : ParsableCommand {
 		}
 		try buildPaths.ensureAllDirectoriesExist()
 		
-		let tarball = try Tarball(templateURL: opensslBaseURL, version: opensslVersion, downloadFolder: buildPaths.workDir, expectedShasum: expectedTarballShasum)
+		let tarball = try Tarball(templateURL: openldapBaseURL, version: openldapVersion, downloadFolder: buildPaths.workDir, expectedShasum: expectedTarballShasum)
 		try await tarball.ensureDownloaded()
 		
 		/* Build all the variants we need. Note only static libs are built because
@@ -129,14 +135,14 @@ struct BuildFramework : ParsableCommand {
 					Config.logger.warning("Unknown target sdk/platform tuple \(target.sdk)/\(target.platform)")
 					(sdkVersion, minSDKVersion) = (nil, nil)
 			}
-			let unbuiltTarget = UnbuiltTarget(target: target, tarball: tarball, buildPaths: buildPaths, sdkVersion: sdkVersion, minSDKVersion: minSDKVersion, opensslVersion: opensslVersion, disableBitcode: disableBitcode, skipExistingArtifacts: skipExistingArtifacts)
+			let unbuiltTarget = UnbuiltTarget(target: target, tarball: tarball, buildPaths: buildPaths, sdkVersion: sdkVersion, minSDKVersion: minSDKVersion, openldapVersion: openldapVersion, disableBitcode: disableBitcode, skipExistingArtifacts: skipExistingArtifacts)
 			let builtTarget = try unbuiltTarget.buildTarget()
 			
 			assert(builtTargets[target] == nil)
 			builtTargets[target] = builtTarget
 			
 			assert(dylibs[target] == nil)
-			dylibs[target] = try builtTarget.buildDylibFromStaticLibs(opensslVersion: opensslVersion, buildPaths: buildPaths, skipExistingArtifacts: skipExistingArtifacts)
+			dylibs[target] = try builtTarget.buildDylibFromStaticLibs(opensslVersion: openldapVersion, buildPaths: buildPaths, skipExistingArtifacts: skipExistingArtifacts)
 		}
 		
 		let targetsByPlatformAndSdks = Dictionary(grouping: targets, by: { PlatformAndSdk(platform: $0.platform, sdk: $0.sdk) })
@@ -313,7 +319,7 @@ struct BuildFramework : ParsableCommand {
 						executable: buildPaths.productName,
 						identifier: "com.xcode-actions." + buildPaths.productName /* TODO */,
 						name: buildPaths.productName,
-						marketingVersion: BuiltTarget.normalizedOpenSSLVersion(opensslVersion),
+						marketingVersion: BuiltTarget.normalizedOpenSSLVersion(openldapVersion),
 						buildVersion: "1",
 						minimumOSVersion: minimumOSVersion
 					),

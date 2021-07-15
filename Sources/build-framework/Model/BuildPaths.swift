@@ -19,7 +19,6 @@ struct BuildPaths {
 	
 	let developerDir: FilePath
 	
-	let opensslConfigsDir: FilePath
 	let templatesDir: FilePath
 	
 	let workDir: FilePath
@@ -81,7 +80,6 @@ struct BuildPaths {
 			Process.spawnAndGetOutput("/usr/bin/xcode-select", args: ["-print-path"]).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
 		)
 		
-		self.opensslConfigsDir = filesPath.appending("OpenSSLConfigs")
 		self.templatesDir = filesPath.appending("Templates")
 		
 		self.workDir = workdir
@@ -165,49 +163,6 @@ struct BuildPaths {
 	
 	func dylibsDir(for target: Target) -> FilePath {
 		return dylibsDir.appending(target.pathComponent)
-	}
-	
-	func opensslConfigsDir(for version: String) throws -> FilePath {
-		var currentVersion = version
-		while true {
-			guard let component = FilePath.Component(currentVersion) else {
-				struct CannotGetFilePathComponentFromVersion : Error {var version: String}
-				throw CannotGetFilePathComponentFromVersion(version: version)
-			}
-			
-			let path = opensslConfigsDir.appending(component)
-			
-			var isDir = ObjCBool(false)
-			if Config.fm.fileExists(atPath: path.string, isDirectory: &isDir) {
-				guard isDir.boolValue else {
-					struct ConfigDirIsAFile : Error {var path: FilePath}
-					throw ConfigDirIsAFile(path: path)
-				}
-				return path
-			} else {
-				/* The config dir does not exist for this exact version. Let’s see
-				 * if we can find a config for a less specific version. */
-				if component.extension?.contains("-") ?? true {
-					/* Either the current version does not have an extension (e.g. 1)
-					 * or the current extension has a dash. If we have a dash we drop
-					 * everything after it including it and try again. */
-					if let idx = component.string.lastIndex(of: "-") {
-						currentVersion = String(component.string[component.string.startIndex..<idx])
-					} else {
-						struct ConfigDirNotFoundForVersion : Error {var version: String}
-						throw ConfigDirNotFoundForVersion(version: version)
-					}
-				} else if let ext = component.extension, ext.last?.isLetter ?? false {
-					/* The current version has an “extension” whose last character is
-					 * a letter (e.g. “1.1.1k”). We drop the letter and try again. */
-					currentVersion = String(currentVersion.dropLast())
-				} else {
-					/* The current version has an “extension” that does not contain a
-					 * dash. We drop it and retry. */
-					currentVersion = component.stem
-				}
-			}
-		}
 	}
 	
 }

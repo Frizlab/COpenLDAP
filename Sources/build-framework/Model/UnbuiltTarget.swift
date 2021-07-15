@@ -13,7 +13,7 @@ struct UnbuiltTarget {
 	
 	var sdkVersion: String?
 	var minSDKVersion: String?
-	var opensslVersion: String
+	var openldapVersion: String
 	
 	var disableBitcode: Bool
 	
@@ -29,8 +29,6 @@ struct UnbuiltTarget {
 	}
 	
 	private func extractTarballBuildAndInstallIfNeeded(installDir: FilePath, sourceDir: FilePath) throws {
-		let opensslConfigDir = try buildPaths.opensslConfigsDir(for: opensslVersion)
-		
 		guard !skipExistingArtifacts || !Config.fm.fileExists(atPath: installDir.string) else {
 			Config.logger.info("Skipping building of target \(target) because \(installDir) exists")
 			return
@@ -64,24 +62,12 @@ struct UnbuiltTarget {
 			struct InternalError : Error {}
 			throw InternalError()
 		}
-		setenv("CROSS_COMPILE",              buildPaths.developerDir.appending("Toolchains/XcodeDefault.xctoolchain/usr/bin").string + "/", 1)
-		setenv("OPENSSLBUILD_SDKs_LOCATION", buildPaths.developerDir.appending("Platforms").appending(platformPathComponent).appending("Developer").string, 1)
-		setenv("OPENSSLBUILD_SDK",           sdkPathComponent.string, 1)
-		setenv("OPENSSL_LOCAL_CONFIG_DIR",   opensslConfigDir.string, 1)
-		if let sdkVersion = sdkVersion {setenv("OPENSSLBUILD_SDKVERSION", sdkVersion, 1)}
-		else                           {unsetenv("OPENSSLBUILD_SDKVERSION")}
-		if let minSDKVersion = minSDKVersion {setenv("OPENSSLBUILD_MIN_SDKVERSION", minSDKVersion, 1)}
-		else                                 {unsetenv("OPENSSLBUILD_MIN_SDKVERSION")}
-		if disableBitcode {setenv("OPENSSLBUILD_DISABLE_BITCODE", "true", 1)}
-		else              {unsetenv("OPENSSLBUILD_DISABLE_BITCODE")}
 		let configArgs = [
-			target.openSSLConfigName,
-			"--prefix=\(installDir.string)",
-			"no-async",
-			"no-shared",
-			"no-tests"
-		] + (target.arch.hasSuffix("64") ? ["enable-ec_nistp_64_gcc_128"] : [])
-		try Process.spawnAndStreamEnsuringSuccess(extractedTarballDir.appending("Configure").string, args: configArgs, outputHandler: Process.logProcessOutputFactory())
+			"--prefix=\(installDir.string)"
+		]
+		struct NotImplemented : Error {}
+		throw NotImplemented()
+		try Process.spawnAndStreamEnsuringSuccess(extractedTarballDir.appending("configure").string, args: configArgs, outputHandler: Process.logProcessOutputFactory())
 		
 		/* *** Build *** */
 		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/xcrun", args: ["make"] + multicoreMakeOption, outputHandler: Process.logProcessOutputFactory())
