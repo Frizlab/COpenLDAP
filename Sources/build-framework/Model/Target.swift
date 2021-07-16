@@ -27,6 +27,21 @@ struct Target : Hashable, ExpressibleByArgument, CustomStringConvertible {
 		self.arch     = String(components[2])
 	}
 	
+	init?(xcframeworkPlatform: String, xcframeworkPlatformVariant: String?, xcframeworkArch: String) {
+		switch (xcframeworkPlatform, xcframeworkPlatformVariant) {
+			case ("macos", nil):            self.init(sdk: "macOS",   platform: "macOS",             arch: xcframeworkArch)
+			case ("ios", nil):              self.init(sdk: "iOS",     platform: "iOS",               arch: xcframeworkArch)
+			case ("ios", "simulator"?):     self.init(sdk: "iOS",     platform: "iOS_Simulator",     arch: xcframeworkArch)
+			case ("ios", "maccatalyst"?):   self.init(sdk: "iOS",     platform: "macOS",             arch: xcframeworkArch)
+			case ("tvos", nil):             self.init(sdk: "tvOS",    platform: "tvOS",              arch: xcframeworkArch)
+			case ("tvos", "simulator"?):    self.init(sdk: "tvOS",    platform: "tvOS_Simulator",    arch: xcframeworkArch)
+			case ("watchos", nil):          self.init(sdk: "watchOS", platform: "watchOS",           arch: xcframeworkArch)
+			case ("watchos", "simulator"?): self.init(sdk: "watchOS", platform: "watchOS_Simulator", arch: xcframeworkArch)
+			default:
+				return nil
+		}
+	}
+	
 	var pathComponent: FilePath.Component {
 		/* The forced-unwrap is **not** fully safe! But it should be most of the
 		 * time (protected when the Target is inited from an argument), so for

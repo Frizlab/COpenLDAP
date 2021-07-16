@@ -107,7 +107,7 @@ struct BuildFramework : ParsableCommand {
 		LoggingSystem.bootstrap{ _ in CLTLogger() }
 		XcodeTools.XcodeToolsConfig.logger?.logLevel = .warning
 		
-		let opensslFramework = try XCFrameworkDependency(url: opensslXCFrameworkURL, expectedShasum: expectedOpenSSLXCFrameworkShasum, skipExistingArtifacts: skipExistingArtifacts)
+		let opensslFramework = try XCFrameworkDependencySource(url: opensslXCFrameworkURL, expectedShasum: expectedOpenSSLXCFrameworkShasum, skipExistingArtifacts: skipExistingArtifacts)
 		let buildPaths = try BuildPaths(filesPath: FilePath(filesPath), workdir: FilePath(workdir), resultdir: resultdir.flatMap{ FilePath($0) }, productName: "COpenLDAP", opensslFramework: opensslFramework)
 		
 		if clean {
@@ -116,7 +116,8 @@ struct BuildFramework : ParsableCommand {
 		}
 		try buildPaths.ensureAllDirectoriesExist()
 		
-		try await opensslFramework.downloadAndExtract(in: buildPaths.workDir)
+		let opensslXCFramework = try await opensslFramework.downloadAndExtract(in: buildPaths.workDir)
+		Config.logger.trace("Parsed OpenSSL XCFramework: \(opensslXCFramework)")
 		
 		let tarball = try Tarball(templateURL: openldapBaseURL, version: openldapVersion, downloadFolder: buildPaths.workDir, expectedShasum: expectedTarballShasum)
 		try await tarball.ensureDownloaded()

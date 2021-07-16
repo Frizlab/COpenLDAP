@@ -78,7 +78,7 @@ struct BuildPaths {
 	 the static xcframework will be built. */
 	let finalStaticLibsAndHeadersDir: FilePath
 	
-	init(filesPath: FilePath, workdir: FilePath, resultdir: FilePath?, productName: String, opensslFramework: XCFrameworkDependency) throws {
+	init(filesPath: FilePath, workdir: FilePath, resultdir: FilePath?, productName: String, opensslFramework: XCFrameworkDependencySource) throws {
 		self.developerDir = try FilePath(
 			Process.spawnAndGetOutput("/usr/bin/xcode-select", args: ["-print-path"]).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
 		)
