@@ -31,10 +31,10 @@ struct BuildFramework : ParsableCommand {
 	@Option(help: "The shasum-256 expected for the tarball. If not set, the integrity of the archive will not be verified.")
 	var expectedTarballShasum: String?
 	
-	@Option(name: .customLong("openssl-xcframework-url"), help: "The URL to the OpenSSL dynamic XCFramework archive. The URL scheme can be file, http or https. A file URL can either point to an XCFramework archive or an XCFramework directly.")
+	@Option(name: .customLong("openssl-xcframework-url"), help: "The URL to the OpenSSL dynamic XCFramework archive (zip format). The URL scheme can be file, http or https. A file URL can either point to an XCFramework archive or an XCFramework directly.")
 	var opensslXCFrameworkURL: URL
 	
-	@Option(name: .customLong("expected-openssl-xcframework-shasum"), help: "The shasum-256 expected for the OpenSSL XCFramework archive.")
+	@Option(name: .customLong("expected-openssl-xcframework-shasum"), help: "The shasum-256 expected for the OpenSSL XCFramework archive. If the URL points to an unarchived XCFramework, this option is ignored.")
 	var expectedOpenSSLXCFrameworkShasum: String?
 	
 	@Flag
@@ -107,13 +107,16 @@ struct BuildFramework : ParsableCommand {
 		LoggingSystem.bootstrap{ _ in CLTLogger() }
 		XcodeTools.XcodeToolsConfig.logger?.logLevel = .warning
 		
-		let buildPaths = try BuildPaths(filesPath: FilePath(filesPath), workdir: FilePath(workdir), resultdir: resultdir.flatMap{ FilePath($0) }, productName: "COpenLDAP")
+		let opensslFramework = try XCFrameworkDependency(url: opensslXCFrameworkURL, expectedShasum: expectedOpenSSLXCFrameworkShasum, skipExistingArtifacts: skipExistingArtifacts)
+		let buildPaths = try BuildPaths(filesPath: FilePath(filesPath), workdir: FilePath(workdir), resultdir: resultdir.flatMap{ FilePath($0) }, productName: "COpenLDAP", opensslFramework: opensslFramework)
 		
 		if clean {
 			Config.logger.info("Cleaning previous builds if applicable")
 			try buildPaths.clean()
 		}
 		try buildPaths.ensureAllDirectoriesExist()
+		
+		try await opensslFramework.downloadAndExtract(in: buildPaths.workDir)
 		
 		let tarball = try Tarball(templateURL: openldapBaseURL, version: openldapVersion, downloadFolder: buildPaths.workDir, expectedShasum: expectedTarballShasum)
 		try await tarball.ensureDownloaded()

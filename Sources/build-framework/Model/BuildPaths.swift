@@ -8,6 +8,8 @@ import Logging
 /** All the paths relevant to the build */
 struct BuildPaths {
 	
+	let opensslXCFramework: FilePath
+	
 	/** Not really a path, but hella convenient to have here */
 	let productName: String
 	let dylibProductNameComponent: FilePath.Component
@@ -42,7 +44,8 @@ struct BuildPaths {
 	 have to merge them in order to get the correct headers all the time. Also
 	 the headers have to be patched to be able to be used in an XCFramework. */
 	let mergedStaticHeadersDir: FilePath
-	/** Contains the libs from previous step, but merged as one.
+	/**
+	 Contains the libs from previous step, but merged as one.
 	 
 	 We have to do this because xcodebuild does not do it automatically when
 	 building an xcframework (this is understandable) and xcframeworks do not
@@ -68,14 +71,14 @@ struct BuildPaths {
 	 variable is not strictly relevant. */
 	let mergedFatDynamicLibsDir: FilePath
 	
-	/** Contains theh final frameworks from which the dynamic xcframework will be
+	/** Contains the final frameworks from which the dynamic xcframework will be
 	 built. */
 	let finalFrameworksDir: FilePath
 	/** Contains the final full static lib install (with headers) from which
 	 the static xcframework will be built. */
 	let finalStaticLibsAndHeadersDir: FilePath
 	
-	init(filesPath: FilePath, workdir: FilePath, resultdir: FilePath?, productName: String) throws {
+	init(filesPath: FilePath, workdir: FilePath, resultdir: FilePath?, productName: String, opensslFramework: XCFrameworkDependency) throws {
 		self.developerDir = try FilePath(
 			Process.spawnAndGetOutput("/usr/bin/xcode-select", args: ["-print-path"]).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
 		)
@@ -85,6 +88,8 @@ struct BuildPaths {
 		self.workDir = workdir
 		self.resultDir = resultdir ?? workdir
 		self.buildDir = self.workDir.appending("build")
+		
+		self.opensslXCFramework = self.workDir.appending(opensslFramework.xcframeworkName)
 		
 		/* Actual (full) validation would be a bit more complex than that */
 		let productNameValid = (productName.first(where: { !$0.isASCII || (!$0.isLetter && !$0.isNumber && $0 != "_") }) == nil)
@@ -124,6 +129,7 @@ struct BuildPaths {
 	}
 	
 	func clean() throws {
+		try Config.fm.ensureDirectoryDeleted(path: opensslXCFramework)
 		try Config.fm.ensureDirectoryDeleted(path: buildDir)
 		try Config.fm.ensureDirectoryDeleted(path: resultXCFrameworkStatic)
 		try Config.fm.ensureDirectoryDeleted(path: resultXCFrameworkDynamic)

@@ -11,8 +11,8 @@ struct Tarball {
 	
 	let url: URL
 	
-	var version: String
-	var localPath: FilePath
+	let version: String
+	let localPath: FilePath
 	
 	var expectedShasum: String?
 	
