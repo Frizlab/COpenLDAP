@@ -139,7 +139,13 @@ struct BuildFramework : ParsableCommand {
 					Config.logger.warning("Unknown target sdk/platform tuple \(target.sdk)/\(target.platform)")
 					(sdkVersion, minSDKVersion) = (nil, nil)
 			}
-			let unbuiltTarget = UnbuiltTarget(target: target, tarball: tarball, buildPaths: buildPaths, sdkVersion: sdkVersion, minSDKVersion: minSDKVersion, openldapVersion: openldapVersion, disableBitcode: disableBitcode, skipExistingArtifacts: skipExistingArtifacts)
+			
+			guard let frameworkPath = opensslXCFramework.frameworkPath(forTarget: target) else {
+				struct NoFrameworkForTargetInXCFrameworkDependency : Error {var target: Target}
+				throw NoFrameworkForTargetInXCFrameworkDependency(target: target)
+			}
+			
+			let unbuiltTarget = UnbuiltTarget(target: target, tarball: tarball, buildPaths: buildPaths, opensslFrameworkName: opensslXCFramework.frameworksName, opensslFrameworkPath: frameworkPath, sdkVersion: sdkVersion, minSDKVersion: minSDKVersion, openldapVersion: openldapVersion, disableBitcode: disableBitcode, skipExistingArtifacts: skipExistingArtifacts)
 			let builtTarget = try unbuiltTarget.buildTarget()
 			
 			assert(builtTargets[target] == nil)

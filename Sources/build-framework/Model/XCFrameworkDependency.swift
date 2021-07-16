@@ -93,8 +93,10 @@ struct XCFrameworkDependency {
 	}
 	
 	/** Returns an absolute path for the framework for the given target. */
-	func framework(forTarget: Target) -> FilePath? {
-		return nil
+	func frameworkPath(forTarget target: Target) -> FilePath? {
+		/* Crashes (presumably) */
+//		return frameworksByTarget[target].flatMap{ path.appending($0.components) }
+		return frameworksByTarget[target].flatMap{ path.appending("/" + $0.string) }
 	}
 	
 	/** Values are absolute paths, relative to the xcframework path. */

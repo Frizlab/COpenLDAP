@@ -45,6 +45,9 @@ struct UnbuiltTarget {
 	var tarball: Tarball
 	var buildPaths: BuildPaths
 	
+	var opensslFrameworkName: String
+	var opensslFrameworkPath: FilePath
+	
 	var sdkVersion: String?
 	var minSDKVersion: String?
 	var openldapVersion: String
