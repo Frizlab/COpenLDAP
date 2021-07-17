@@ -73,7 +73,9 @@ extension Target {
 			case "tvOS_Simulator":    return "AppleTVSimulator"
 			case "watchOS":           return "WatchOS"
 			case "watchOS_Simulator": return "WatchSimulator"
-			default: return platform.replacingOccurrences(of: "_", with: "")
+			default:
+				Config.logger.warning("Unknown platform legacy name for platform \(platform)")
+				return platform.replacingOccurrences(of: "_", with: "")
 		}
 	}
 	
@@ -91,12 +93,36 @@ extension Target {
 			case ("tvOS_Simulator", _):    return "tvos-simulator"
 			case ("watchOS", _):           return "watchos"
 			case ("watchOS_Simulator", _): return "watchos-simulator"
-			default: return platform.lowercased().replacingOccurrences(of: "_", with: "-")
+			default:
+				Config.logger.warning("Unknown platform version name for platform \(platform) and sdk \(sdk)")
+				return platform.lowercased().replacingOccurrences(of: "_", with: "-")
 		}
 	}
 	
 	var platformVersionName: String {
 		return Self.platformVersionName(fromPlatform: platform, sdk: sdk)
+	}
+	
+	static func hostForConfigure(fromPlatform platform: String, arch: String) -> String {
+		let configArch: String
+		/* This table is mostly guess-work! We’ll have to check everything’s going
+		 * well when we have the final XCFramework. */
+		switch arch {
+			case "arm64e":   configArch = "aarch64"
+			case "arm64":    configArch = "aarch64"
+			case "x86_64":   configArch = "x86_64"
+			case "i386":     configArch = "i386"
+			case "armv7k":   configArch = "arm"
+			case "arm64_32": configArch = "arm"
+			default:
+				Config.logger.warning("Unknown arch for configure: \(arch)")
+				configArch = arch
+		}
+		return "\(configArch)-apple-darwin"
+	}
+	
+	var hostForConfigure: String {
+		return Self.hostForConfigure(fromPlatform: platform, arch: arch)
 	}
 	
 }

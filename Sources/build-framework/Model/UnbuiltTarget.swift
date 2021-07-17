@@ -78,15 +78,47 @@ struct UnbuiltTarget {
 		 * files). */
 		let extractedTarballDir = try tarball.extract(in: sourceDir)
 		
+		/* ********* SOURCE PATCH ********* */
+		
+		let patchWitness = extractedTarballDir.appending(".xct_patched")
+		if Config.fm.fileExists(atPath: patchWitness.string) {
+			Config.logger.info("Skipping patch of source for target \(target)", metadata: ["reason": "already patched (file \(patchWitness) exists"])
+		} else {
+			Config.logger.info("Patching source for target \(target)")
+			
+			/* TODO: If patch fails, we’ll get a partially patched source… */
+			Config.fm.createFile(atPath: patchWitness.string, contents: nil, attributes: nil)
+			
+			/* First patch: openssl/ -> COpenSSL/ */
+			let exclusions = try! [
+				NSRegularExpression(pattern: #"^\.[^/]+$"#, options: []),
+				NSRegularExpression(pattern: #"/\.[^/]+$"#, options: []),
+			]
+			let replacementRegex = try! NSRegularExpression(pattern: #"\bopenssl/"#, options: [])
+			try Config.fm.iterateFiles(in: extractedTarballDir, exclude: exclusions, handler: { fullPath, _, isDir in
+				guard !isDir else {return true}
+				guard let str = try? String(contentsOf: fullPath.url, encoding: .utf8) else {
+					Config.logger.debug("Skipping patch of \(fullPath)", metadata: ["reason": "cannot get file contents as utf8 string"])
+					return true
+				}
+				Config.logger.trace("Patching (replace '\\bopenssl/' with '\(opensslFrameworkName)/') \(fullPath)")
+				let objstr = NSMutableString(string: str)
+				replacementRegex.replaceMatches(in: objstr, range: NSRange(location: 0, length: objstr.length), withTemplate: "\(opensslFrameworkName)/")
+				try (objstr as String).write(to: fullPath.url, atomically: true, encoding: .utf8)
+				return true
+			})
+			/* Second patch: do not build detach.c */
+			let makefilePath = extractedTarballDir.appending("libraries/liblutil/Makefile.in")
+			let str = try String(contentsOf: makefilePath.url)
+			let detachRegex = try! NSRegularExpression(pattern: #"\bdetach\..\b"#, options: [])
+			let objstr = NSMutableString(string: str)
+			detachRegex.replaceMatches(in: objstr, range: NSRange(location: 0, length: objstr.length), withTemplate: "")
+			try (objstr as String).write(to: makefilePath.url, atomically: true, encoding: .utf8)
+		}
+		
 		/* ********* BUILD & INSTALL ********* */
 		
 		Config.logger.info("Building for target \(target)")
-		
-		/* Apparently we *have to* change the CWD (though we should do it through
-		 * Process which has an API for that). */
-		let previousCwd = Config.fm.currentDirectoryPath
-		Config.fm.changeCurrentDirectoryPath(extractedTarballDir.string)
-		defer {Config.fm.changeCurrentDirectoryPath(previousCwd)}
 		
 		/* Prepare -j option for make */
 		let multicoreMakeOption = Self.numberOfCores.flatMap{ ["-j", "\($0)"] } ?? []
@@ -99,11 +131,14 @@ struct UnbuiltTarget {
 			struct InternalError : Error {}
 			throw InternalError()
 		}
+		/* We should change the env via the Process APIs so that only the children
+		 * has a different env, but our conveniences don’t know these APIs. */
+#warning("TODO: Env")
 		let configArgs = [
-			"--prefix=\(installDir.string)"
+			"--prefix=\(installDir.string)",
+			"--host=\(target.hostForConfigure)",
+			"--with-yielding_select=yes"
 		]
-		struct NotImplemented : Error {}
-		throw NotImplemented()
 		try Process.spawnAndStreamEnsuringSuccess(extractedTarballDir.appending("configure").string, args: configArgs, outputHandler: Process.logProcessOutputFactory())
 		
 		/* *** Build *** */

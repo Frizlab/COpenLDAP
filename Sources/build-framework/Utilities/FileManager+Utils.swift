@@ -42,7 +42,7 @@ extension FileManager {
 	/**
 	 Call the handler with the files. If the handler returns false, the iteration
 	 is stopped. */
-	func iterateFiles(in folder: FilePath, exclude: [NSRegularExpression], handler: (_ fullPath: FilePath, _ relativePath: FilePath, _ isDirectory: Bool) -> Bool) throws {
+	func iterateFiles(in folder: FilePath, exclude: [NSRegularExpression], handler: (_ fullPath: FilePath, _ relativePath: FilePath, _ isDirectory: Bool) throws -> Bool) throws {
 		let folder = folder.lexicallyNormalized()
 		guard let enumerator = enumerator(at: folder.url, includingPropertiesForKeys: [.isDirectoryKey]) else {
 			struct CannotCreateEnumerator : Error {var path: FilePath}
@@ -68,7 +68,7 @@ extension FileManager {
 				struct CannotGetIsDirectory : Error {var enumeratedPath: FilePath; var currentPath: FilePath}
 				throw CannotGetIsDirectory(enumeratedPath: folder, currentPath: relativePath)
 			}
-			guard handler(fullPath, relativePath, isDir) else {return}
+			guard try handler(fullPath, relativePath, isDir) else {return}
 		}
 	}
 	
