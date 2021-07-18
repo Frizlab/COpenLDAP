@@ -1,4 +1,6 @@
 module |ModuleName| {
 	header "|ModuleName|.h"
 	export *
+	
+	link "sasl2"
 }

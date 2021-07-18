@@ -176,39 +176,45 @@ struct BuildFramework : ParsableCommand {
 				}
 			}
 			
-			/* Merge the headers and drop the “include/openssl” path component. */
+			/* Merge the headers and drop the “include” path component. */
 			var mergedHeaders = [FilePath]()
 			for header in builtTarget.headers {
 				/* Correct way to do this is lines below, but crashes for now. */
-//				guard header.components.starts(with: ["include", "openssl"]) else {
-//					Config.logger.warning("Got a header not in “include/openssl” dir. Skipping.")
+//				guard header.components.starts(with: ["include"]) else {
+//					Config.logger.warning("Got a header not in “include” dir. Skipping.")
 //					continue
 //				}
 //				let headerNoInclude = FilePath(root: nil, header.components.dropFirst(2))
-				guard header.string.starts(with: "include/openssl/") else {
-					Config.logger.warning("Got a header not in “include/openssl” dir. Skipping.")
+				guard header.string.starts(with: "include/") else {
+					Config.logger.warning("Got a header not in “include” dir. Skipping.")
 					continue
 				}
-				guard header.lastComponent?.string != "asn1_mac.h" else {
-					Config.logger.info("Skipping obsolete file asn1_mac.h")
-					continue
-				}
-				let headerNoInclude = FilePath(String(header.string.dropFirst("include/openssl/".count)))
+				let headerNoInclude = FilePath(String(header.string.dropFirst("include/".count)))
 				var unmergedHeader = UnmergedUnpatchedHeader(
 					headersAndArchs: targets.map{ (buildPaths.installDir(for: $0).pushing(header), $0.arch) },
 					patches: [
-						{ str in str.replacingOccurrences(of: "include <openssl/", with: "include <\(buildPaths.productName)/") },
-						{ str in str.replacingOccurrences(of: "include <inttypes.h>", with: "include <sys/types.h>") }
+						{ filepath, str in
+							guard filepath.lastComponent == "ldif.h" else {return str}
+							let searched = "#include <ldap_cdefs.h>\n"
+							let replacement = searched + "#include <stdio.h>\n"
+							return str.replacingOccurrences(of: searched, with: replacement, options: .literal)
+						},
+						{ _, str in
+							var str = str
+							for header in builtTarget.headers {
+								guard let headerName = header.lastComponent else {continue}
+								let searched = "<\(headerName)>"
+								let replacement = "<\(buildPaths.productName)/\(headerName)>"
+								str = str.replacingOccurrences(of: searched, with: replacement, options: .literal)
+							}
+							return str
+						}
 					],
 					skipExistingArtifacts: skipExistingArtifacts
 				)
 				try unmergedHeader.patchAndMergeHeaders(at: buildPaths.mergedDynamicHeadersDir.appending(platformAndSdk.pathComponent).pushing(headerNoInclude))
-				let regex = try! NSRegularExpression(pattern: #"include <openssl/([^>]*)>"#, options: [])
-				unmergedHeader.patches[0] = { str in
-					let objstr = NSMutableString(string: str)
-					regex.replaceMatches(in: objstr, range: NSRange(location: 0, length: objstr.length), withTemplate: #"include "$1""#)
-					return objstr as String
-				}
+				
+				unmergedHeader.patches.removeLast()
 				try unmergedHeader.patchAndMergeHeaders(at: buildPaths.mergedStaticHeadersDir.appending(platformAndSdk.pathComponent).pushing(headerNoInclude))
 				mergedHeaders.append(headerNoInclude)
 			}

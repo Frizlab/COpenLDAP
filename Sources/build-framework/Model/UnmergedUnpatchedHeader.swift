@@ -5,7 +5,7 @@ import Foundation
 struct UnmergedUnpatchedHeader {
 	
 	var headersAndArchs: [(header: FilePath, arch: String)]
-	var patches: [(String) -> String]
+	var patches: [(FilePath, String) -> String]
 	var skipExistingArtifacts: Bool
 	
 	func patchAndMergeHeaders(at destPath: FilePath) throws {
@@ -25,14 +25,15 @@ struct UnmergedUnpatchedHeader {
 		let needsMerge = try (Set(headersAndArchs.map{ try Data(contentsOf: $0.header.url) }).count > 1)
 		
 		if !needsMerge {
-			/* We simply copy any header to the destination */
+			/* We simply copy any header to the destination, w/ patching if needed */
 			if patches.isEmpty {
 				Config.logger.debug("  -> No need for merge nor patch; copying header directly")
 				try Config.fm.copyItem(at: headersAndArchs.first!.header.url, to: destPath.url)
 			} else {
 				Config.logger.debug("  -> No need for merge; simply patching header")
-				let str = try String(contentsOf: headersAndArchs.first!.header.url)
-				let patchedStr = patches.reduce(str, { $1($0) })
+				let filepath = headersAndArchs.first!.header
+				let str = try String(contentsOf: filepath.url)
+				let patchedStr = patches.reduce(str, { $1(filepath, $0) })
 				try patchedStr.write(to: destPath.url, atomically: true, encoding: .utf8)
 			}
 		} else {
@@ -47,7 +48,7 @@ struct UnmergedUnpatchedHeader {
 			for (header, arch) in headersAndArchs {
 				defer {first = false}
 				result += (first ? "#if " : "#elif ") + "__is_target_arch(\(arch))\n"
-				result += try patches.reduce(String(contentsOf: header.url), { $1($0) })  + "\n"
+				result += try patches.reduce(String(contentsOf: header.url), { $1(header, $0) })  + "\n"
 			}
 			result += "#endif\n"
 			try result.write(to: destPath.url, atomically: true, encoding: .utf8)
