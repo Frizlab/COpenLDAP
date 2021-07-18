@@ -48,7 +48,7 @@ struct UnbuiltTarget {
 	var opensslFrameworkName: String
 	var opensslFrameworkPath: FilePath
 	
-	var sdkVersion: String?
+	var sdkVersion: String
 	var minSDKVersion: String?
 	var openldapVersion: String
 	
@@ -120,32 +120,57 @@ struct UnbuiltTarget {
 		
 		Config.logger.info("Building for target \(target)")
 		
+		/* I’m not sure we *have to* change the CWD, but config.log goes in CWD,
+		 * so I think it’s best if we do (though we should do it through Process
+		 * which has an API for that). */
+		let previousCwd = Config.fm.currentDirectoryPath
+		Config.fm.changeCurrentDirectoryPath(extractedTarballDir.string)
+		defer {Config.fm.changeCurrentDirectoryPath(previousCwd)}
+		
 		/* Prepare -j option for make */
 		let multicoreMakeOption = Self.numberOfCores.flatMap{ ["-j", "\($0)"] } ?? []
 		
 		/* *** Configure *** */
 		guard
 			let platformPathComponent = FilePath.Component(target.platformLegacyName + ".platform"),
-			let sdkPathComponent = FilePath.Component(target.platformLegacyName + (sdkVersion ?? "") + ".sdk")
+			let sdkPathComponent = FilePath.Component(target.platformLegacyName/* + sdkVersion*/ + ".sdk")
 		else {
 			struct InternalError : Error {}
 			throw InternalError()
 		}
 		/* We should change the env via the Process APIs so that only the children
 		 * has a different env, but our conveniences don’t know these APIs. */
-#warning("TODO: Env")
+		let sdksLocation = buildPaths.developerDir.appending("Platforms").appending(platformPathComponent).appending("Developer")
+		let isysroot = sdksLocation.appending("SDKs").appending(sdkPathComponent)
+		// Add this in common flags for Mac Catalyst: -target x86_64-apple-ios13.6-macabi
+		let commonFlags = "-isysroot \(isysroot) -arch \(target.arch) -fembed-bitcode -fPIC -F\(opensslFrameworkPath.removingLastComponent())"
+		setenv("CPPFLAGS", "\(commonFlags)", 1)
+		setenv("LDFLAGS",  "\(commonFlags) -framework COpenSSL -Wl,-rpath -Wl,\(opensslFrameworkPath.removingLastComponent())", 1)
 		let configArgs = [
+			"ac_cv_func_memcmp_working=yes", /* Avoid the _lutil_memcmp undefined symbol in the resulting libs */
+			"--disable-debug",
+			"--enable-static",
+			"--disable-shared", /* We don’t need the shared libraries as we rebuild them from the static ones */
+			"--disable-slapd", /* We don’t need slapd; we only need the libs */
 			"--prefix=\(installDir.string)",
 			"--host=\(target.hostForConfigure)",
+			"--with-pic",
+//			"--with-tls=openssl",
 			"--with-yielding_select=yes"
-		]
-		try Process.spawnAndStreamEnsuringSuccess(extractedTarballDir.appending("configure").string, args: configArgs, outputHandler: Process.logProcessOutputFactory())
+		] + (target.sdk != "macOS" ? ["--without-cyrus-sasl"] : [])
+		try Process.spawnAndStreamEnsuringSuccess("./configure", args: configArgs, outputHandler: Process.logProcessOutputFactory())
+		
+		/* *** make depend *** */
+		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/xcrun", args: ["make", "depend"] + multicoreMakeOption, outputHandler: Process.logProcessOutputFactory())
 		
 		/* *** Build *** */
-		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/xcrun", args: ["make"] + multicoreMakeOption, outputHandler: Process.logProcessOutputFactory())
+		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/xcrun", args: ["make", "-C", "libraries"] + multicoreMakeOption, outputHandler: Process.logProcessOutputFactory())
 		
-		/* *** Install *** */
-		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/xcrun", args: ["make", "install_sw"] + multicoreMakeOption, outputHandler: Process.logProcessOutputFactory())
+		/* *** Install the libs *** */
+		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/xcrun", args: ["make", "-C", "libraries", "install"] + multicoreMakeOption, outputHandler: Process.logProcessOutputFactory())
+		
+		/* *** Install the headers *** */
+		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/xcrun", args: ["make", "-C", "include", "install"] + multicoreMakeOption, outputHandler: Process.logProcessOutputFactory())
 	}
 	
 	private func retrieveArtifacts() throws -> (headers: [FilePath], staticLibs: [FilePath]) {
@@ -172,9 +197,14 @@ struct UnbuiltTarget {
 					checkFileLocation(expectedLocation: "lib", fileType: "lib")
 					staticLibs.append(relativePath)
 					
+				case (false, "la"):
+					/* libtool library file. We don’t care about those. But let’s
+					 * check it is at an expected location. */
+					checkFileLocation(expectedLocation: "lib", fileType: "libtool library file")
+					
 				case (false, "h"):
 					/* We found a header lib. Let’s check its location and add it. */
-					checkFileLocation(expectedLocation: "include/openssl", fileType: "header")
+					checkFileLocation(expectedLocation: "include", fileType: "header")
 					headers.append(relativePath)
 					
 				case (false, nil):

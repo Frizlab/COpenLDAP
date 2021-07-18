@@ -49,14 +49,17 @@ struct BuiltTarget {
 		try Config.fm.ensureDirectoryDeleted(path: destinationDir)
 		try Config.fm.ensureDirectory(path: destinationDir)
 		
-		/* Apparently we *have to* change the CWD (though we should do it through
-		 * Process which has an API for that). */
-		let previousCwd = Config.fm.currentDirectoryPath
-		Config.fm.changeCurrentDirectoryPath(destinationDir.string)
-		defer {Config.fm.changeCurrentDirectoryPath(previousCwd)}
-		
 		for staticLibPath in absoluteStaticLibrariesPaths {
-			Config.logger.info("Extracting \(staticLibPath) to \(destinationDir)")
+			let curDestDir = destinationDir.appending(staticLibPath.stem ?? "unnamed")
+			try Config.fm.ensureDirectory(path: curDestDir)
+			
+			/* Apparently we *have to* change the CWD (though we should do it through
+			 * Process which has an API for that). */
+			let previousCwd = Config.fm.currentDirectoryPath
+			Config.fm.changeCurrentDirectoryPath(curDestDir.string)
+			defer {Config.fm.changeCurrentDirectoryPath(previousCwd)}
+			
+			Config.logger.info("Extracting \(staticLibPath) to \(curDestDir)")
 			try Process.spawnAndStreamEnsuringSuccess(
 				"/usr/bin/xcrun",
 				args: ["ar", "-x", staticLibPath.string],
@@ -81,12 +84,16 @@ struct BuiltTarget {
 		Config.logger.debug("got sdk \(sdk), min sdk \(minSdk)", metadata: ["target": "\(target)"])
 		
 		let objectDir = buildPaths.libObjectsDir(for: target)
-		let objectFiles = try Config.fm.contentsOfDirectory(atPath: objectDir.string).filter{ $0.hasSuffix(".o") }.map{ objectDir.appending($0) }
+		var objectFiles = [FilePath]()
+		try Config.fm.iterateFiles(in: objectDir, exclude: [], handler: { fullPath, _, isDir in
+			if fullPath.extension == "o" {objectFiles.append(fullPath)}
+			return true
+		})
 		Config.logger.info("Creating dylib at \(destination) from objects in \(objectDir)")
 		try Process.spawnAndStreamEnsuringSuccess(
 			"/usr/bin/xcrun",
 			args: ["ld"] + objectFiles.map{ $0.string } + (hasBitcode ? ["-bitcode_bundle"] : []) + [
-				"-dylib", "-lSystem",
+				"-dylib", "-lSystem", "-lsasl2", "-lresolv",
 				"-application_extension",
 				"-arch", target.arch,
 				"-platform_version", target.platformVersionName, minSdk, sdk,

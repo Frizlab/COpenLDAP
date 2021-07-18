@@ -83,6 +83,17 @@ extension Target {
 		return Self.platformLegacyName(fromPlatform: platform)
 	}
 	
+	static func sdkLegacyName(fromPlatform platform: String, sdk: String) -> String {
+		switch (platform, sdk) {
+			case ("macOS", "iOS"): return platformLegacyName(fromPlatform: "iOS")
+			default:               return platformLegacyName(fromPlatform: platform)
+		}
+	}
+
+	var sdkLegacyName: String {
+		return Self.sdkLegacyName(fromPlatform: platform, sdk: sdk)
+	}
+	
 	static func platformVersionName(fromPlatform platform: String, sdk: String) -> String {
 		switch (platform, sdk) {
 			case ("macOS", "iOS"):         return "mac-catalyst"

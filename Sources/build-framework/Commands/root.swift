@@ -49,28 +49,8 @@ struct BuildFramework : ParsableCommand {
 	@Option
 	var targets = [
 		Target(sdk: "macOS", platform: "macOS", arch: "arm64"),
-		Target(sdk: "macOS", platform: "macOS", arch: "x86_64"),
-		
-		Target(sdk: "iOS", platform: "iOS", arch: "arm64"),
-		Target(sdk: "iOS", platform: "iOS", arch: "arm64e"),
-		
-		Target(sdk: "iOS", platform: "iOS_Simulator", arch: "arm64"),
-		Target(sdk: "iOS", platform: "iOS_Simulator", arch: "x86_64"),
-		
-		Target(sdk: "iOS", platform: "macOS", arch: "arm64"),
-		Target(sdk: "iOS", platform: "macOS", arch: "x86_64"),
-		
-		Target(sdk: "tvOS", platform: "tvOS", arch: "arm64"),
-		
-//		Target(sdk: "tvOS", platform: "tvOS_Simulator", arch: "arm64"), /* Was not in original build repo, but why not add it one of these days if it exists */
-		Target(sdk: "tvOS", platform: "tvOS_Simulator", arch: "x86_64"),
-		
-		Target(sdk: "watchOS", platform: "watchOS", arch: "armv7k"),
-		Target(sdk: "watchOS", platform: "watchOS", arch: "arm64_32"),
-		
-		Target(sdk: "watchOS", platform: "watchOS_Simulator", arch: "arm64"),
-		Target(sdk: "watchOS", platform: "watchOS_Simulator", arch: "x86_64"),
-		Target(sdk: "watchOS", platform: "watchOS_Simulator", arch: "i386")
+		Target(sdk: "macOS", platform: "macOS", arch: "x86_64")
+		/* libsasl2 is not available on Apple platforms other than macOS. */
 	]
 	
 	@Option(name: .customLong("macos-sdk-version"))
@@ -127,17 +107,17 @@ struct BuildFramework : ParsableCommand {
 		var dylibs = [Target: FilePath]()
 		var builtTargets = [Target: BuiltTarget]()
 		for target in targets {
-			let sdkVersion: String?
+			let sdkVersion: String
 			let minSDKVersion: String?
 			switch (target.sdk, target.platform) {
-				case ("iOS", "macOS"): (sdkVersion, minSDKVersion) = (catalystSDKVersion, catalystMinSDKVersion)
-				case ("macOS", _):     (sdkVersion, minSDKVersion) = (   macOSSDKVersion,    macOSMinSDKVersion)
-				case ("iOS", _):       (sdkVersion, minSDKVersion) = (     iOSSDKVersion,      iOSMinSDKVersion)
-				case ("tvOS", _):      (sdkVersion, minSDKVersion) = (    tvOSSDKVersion,     tvOSMinSDKVersion)
-				case ("watchOS", _):   (sdkVersion, minSDKVersion) = ( watchOSSDKVersion,  watchOSMinSDKVersion)
+				case ("iOS", "macOS"): (sdkVersion, minSDKVersion) = try (catalystSDKVersion ?? Process.spawnAndGetOutput("/usr/bin/xcrun", args: ["-sdk", "macosx",    "--show-sdk-version"]).trimmingCharacters(in: .whitespacesAndNewlines), catalystMinSDKVersion ?? Process.spawnAndGetOutput("/usr/bin/xcrun", args: ["-sdk", "iphoneos",  "--show-sdk-version"]).trimmingCharacters(in: .whitespacesAndNewlines))
+				case ("macOS", _):     (sdkVersion, minSDKVersion) = try (   macOSSDKVersion ?? Process.spawnAndGetOutput("/usr/bin/xcrun", args: ["-sdk", "macosx",    "--show-sdk-version"]).trimmingCharacters(in: .whitespacesAndNewlines),    macOSMinSDKVersion)
+				case ("iOS", _):       (sdkVersion, minSDKVersion) = try (     iOSSDKVersion ?? Process.spawnAndGetOutput("/usr/bin/xcrun", args: ["-sdk", "iphoneos",  "--show-sdk-version"]).trimmingCharacters(in: .whitespacesAndNewlines),      iOSMinSDKVersion)
+				case ("tvOS", _):      (sdkVersion, minSDKVersion) = try (    tvOSSDKVersion ?? Process.spawnAndGetOutput("/usr/bin/xcrun", args: ["-sdk", "appletvos", "--show-sdk-version"]).trimmingCharacters(in: .whitespacesAndNewlines),     tvOSMinSDKVersion)
+				case ("watchOS", _):   (sdkVersion, minSDKVersion) = try ( watchOSSDKVersion ?? Process.spawnAndGetOutput("/usr/bin/xcrun", args: ["-sdk", "watchos",   "--show-sdk-version"]).trimmingCharacters(in: .whitespacesAndNewlines),  watchOSMinSDKVersion)
 				default:
 					Config.logger.warning("Unknown target sdk/platform tuple \(target.sdk)/\(target.platform)")
-					(sdkVersion, minSDKVersion) = (nil, nil)
+					(sdkVersion, minSDKVersion) = ("1.0", nil)
 			}
 			
 			guard let frameworkPath = opensslXCFramework.frameworkPath(forTarget: target) else {
