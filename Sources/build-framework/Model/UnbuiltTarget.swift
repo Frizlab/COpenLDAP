@@ -163,7 +163,7 @@ struct UnbuiltTarget {
 			"--with-pic",
 			"--with-tls=openssl",
 			"--with-yielding_select=yes"
-		] + (target.sdk != "macOS" ? ["--without-cyrus-sasl"] : [])
+		]
 		try Process.spawnAndStreamEnsuringSuccess("./configure", args: configArgs, outputHandler: Process.logProcessOutputFactory())
 		
 		/* *** make depend *** */
