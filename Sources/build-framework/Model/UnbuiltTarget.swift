@@ -62,7 +62,7 @@ struct UnbuiltTarget {
 		try extractTarballBuildAndInstallIfNeeded(installDir: installDir, sourceDir: sourceDir)
 		
 		let (headers, staticLibs) = try retrieveArtifacts()
-		return BuiltTarget(target: target, sourceFolder: sourceDir, installFolder: installDir, staticLibraries: staticLibs, dynamicLibraries: [], headers: headers, resources: [])
+		return BuiltTarget(target: target, sourceFolder: sourceDir, installFolder: installDir, opensslFrameworkName: opensslFrameworkName, opensslFrameworkPath: opensslFrameworkPath, staticLibraries: staticLibs, dynamicLibraries: [], headers: headers, resources: [])
 	}
 	
 	private func extractTarballBuildAndInstallIfNeeded(installDir: FilePath, sourceDir: FilePath) throws {
@@ -107,7 +107,13 @@ struct UnbuiltTarget {
 				try (objstr as String).write(to: fullPath.url, atomically: true, encoding: .utf8)
 				return true
 			})
-			/* Second patch: do not build detach.c */
+			/* Second patch: cheat on libssl detection (remove “-lssl”, replace “-lcrypto” with “-framework COpenSSL”) */
+			let configFile = extractedTarballDir.appending("configure")
+			try String(contentsOf: configFile.url)
+				.replacingOccurrences(of: "-lssl ", with: "")
+				.replacingOccurrences(of: "-lcrypto", with: "-framework \(opensslFrameworkName)")
+				.write(to: configFile.url, atomically: true, encoding: .utf8)
+			/* Third patch: do not build detach.c */
 			let makefilePath = extractedTarballDir.appending("libraries/liblutil/Makefile.in")
 			let str = try String(contentsOf: makefilePath.url)
 			let detachRegex = try! NSRegularExpression(pattern: #"\bdetach\..\b"#, options: [])
@@ -145,7 +151,7 @@ struct UnbuiltTarget {
 		// Add this in common flags for Mac Catalyst: -target x86_64-apple-ios13.6-macabi
 		let commonFlags = "-isysroot \(isysroot) -arch \(target.arch) -fembed-bitcode -fPIC -F\(opensslFrameworkPath.removingLastComponent())"
 		setenv("CPPFLAGS", "\(commonFlags)", 1)
-		setenv("LDFLAGS",  "\(commonFlags) -framework COpenSSL -Wl,-rpath -Wl,\(opensslFrameworkPath.removingLastComponent())", 1)
+		setenv("LDFLAGS",  "\(commonFlags) -Wl,-rpath -Wl,\(opensslFrameworkPath.removingLastComponent())", 1)
 		let configArgs = [
 			"ac_cv_func_memcmp_working=yes", /* Avoid the _lutil_memcmp undefined symbol in the resulting libs */
 			"--disable-debug",
@@ -155,7 +161,7 @@ struct UnbuiltTarget {
 			"--prefix=\(installDir.string)",
 			"--host=\(target.hostForConfigure)",
 			"--with-pic",
-//			"--with-tls=openssl",
+			"--with-tls=openssl",
 			"--with-yielding_select=yes"
 		] + (target.sdk != "macOS" ? ["--without-cyrus-sasl"] : [])
 		try Process.spawnAndStreamEnsuringSuccess("./configure", args: configArgs, outputHandler: Process.logProcessOutputFactory())

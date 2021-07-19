@@ -132,7 +132,7 @@ struct BuildFramework : ParsableCommand {
 			builtTargets[target] = builtTarget
 			
 			assert(dylibs[target] == nil)
-			dylibs[target] = try builtTarget.buildDylibFromStaticLibs(opensslVersion: openldapVersion, buildPaths: buildPaths, skipExistingArtifacts: skipExistingArtifacts)
+			dylibs[target] = try builtTarget.buildDylibFromStaticLibs(openldapVersion: openldapVersion, buildPaths: buildPaths, skipExistingArtifacts: skipExistingArtifacts)
 		}
 		
 		let targetsByPlatformAndSdks = Dictionary(grouping: targets, by: { PlatformAndSdk(platform: $0.platform, sdk: $0.sdk) })
@@ -315,7 +315,7 @@ struct BuildFramework : ParsableCommand {
 						executable: buildPaths.productName,
 						identifier: "com.xcode-actions." + buildPaths.productName /* TODO */,
 						name: buildPaths.productName,
-						marketingVersion: BuiltTarget.normalizedOpenSSLVersion(openldapVersion),
+						marketingVersion: BuiltTarget.normalizedOpenLDAPVersion(openldapVersion),
 						buildVersion: "1",
 						minimumOSVersion: minimumOSVersion
 					),

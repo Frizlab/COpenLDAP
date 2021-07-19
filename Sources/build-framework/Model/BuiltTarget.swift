@@ -15,6 +15,9 @@ struct BuiltTarget {
 	var sourceFolder: FilePath
 	var installFolder: FilePath
 	
+	var opensslFrameworkName: String
+	var opensslFrameworkPath: FilePath
+	
 	/** Paths of the static libraries, _relative to the install folder_. */
 	var staticLibraries: [FilePath]
 	/** Paths of the dynamic libraries, _relative to the install folder_. */
@@ -33,9 +36,9 @@ struct BuiltTarget {
 	}
 	
 	/** Returns an absolute FilePath */
-	func buildDylibFromStaticLibs(opensslVersion: String, buildPaths: BuildPaths, skipExistingArtifacts: Bool) throws -> FilePath {
+	func buildDylibFromStaticLibs(openldapVersion: String, buildPaths: BuildPaths, skipExistingArtifacts: Bool) throws -> FilePath {
 		try buildLibObjects(buildPaths: buildPaths, skipExistingArtifacts: skipExistingArtifacts)
-		return try buildDylib(opensslVersion: opensslVersion, buildPaths: buildPaths, skipExistingArtifacts: skipExistingArtifacts)
+		return try buildDylib(openldapVersion: openldapVersion, buildPaths: buildPaths, skipExistingArtifacts: skipExistingArtifacts)
 	}
 	
 	private func buildLibObjects(buildPaths: BuildPaths, skipExistingArtifacts: Bool) throws {
@@ -68,7 +71,7 @@ struct BuiltTarget {
 		}
 	}
 	
-	private func buildDylib(opensslVersion: String, buildPaths: BuildPaths, skipExistingArtifacts: Bool) throws -> FilePath {
+	private func buildDylib(openldapVersion: String, buildPaths: BuildPaths, skipExistingArtifacts: Bool) throws -> FilePath {
 		/* Now we build the dynamic libraries. We’ll use those to get FAT dynamic
 		 * libraries later. */
 		let destination = buildPaths.dylibsDir(for: target).appending(buildPaths.dylibProductNameComponent)
@@ -94,12 +97,13 @@ struct BuiltTarget {
 			"/usr/bin/xcrun",
 			args: ["ld"] + objectFiles.map{ $0.string } + (hasBitcode ? ["-bitcode_bundle"] : []) + [
 				"-dylib", "-lSystem", "-lsasl2", "-lresolv",
+				"-framework", opensslFrameworkName, "-F\(opensslFrameworkPath.removingLastComponent())",
 				"-application_extension",
 				"-arch", target.arch,
 				"-platform_version", target.platformVersionName, minSdk, sdk,
 				"-syslibroot", "\(buildPaths.developerDir)/Platforms/\(target.platformLegacyName).platform/Developer/SDKs/\(target.platformLegacyName).sdk",
-				"-compatibility_version", Self.normalizedOpenSSLVersion(opensslVersion), /* Not true, but we do not care; the resulting lib will be in a framework which will be embedded in the app and not reused 99.99% of the time, so… */
-				"-current_version", Self.normalizedOpenSSLVersion(opensslVersion),
+				"-compatibility_version", Self.normalizedOpenLDAPVersion(openldapVersion), /* Not true, but we do not care; the resulting lib will be in a framework which will be embedded in the app and not reused 99.99% of the time, so… */
+				"-current_version", Self.normalizedOpenLDAPVersion(openldapVersion),
 				"-o", destination.string
 			],
 			outputHandler: Process.logProcessOutputFactory()
@@ -272,18 +276,7 @@ extension BuiltTarget {
 		return foundBitcode || foundLLVM
 	}
 	
-	static func normalizedOpenSSLVersion(_ version: String) -> String {
-		let version = String(version.split(separator: "-").first ?? "") /* We remove all beta reference (example of version with beta: 3.0.0-beta1) */
-		if let letter = version.last, let ascii = letter.asciiValue, letter.isLetter, letter.isLowercase {
-			/* We probably have a version of the for “1.2.3a” (we should do more
-			 * checks but it’s late and I’m lazy).
-			 * Let’s convert the letter to a number (a=01, b=02, j=10, etc.) and
-			 * replace it with the number.
-			 * For 1.2.3a for instance, we get 1.2.301 */
-			let base = version.dropLast()
-			let value = ascii - Character("a").asciiValue! + 1
-			return base + String(format: "%02d", value)
-		}
+	static func normalizedOpenLDAPVersion(_ version: String) -> String {
 		return version
 	}
 	
