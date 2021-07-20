@@ -26,8 +26,8 @@ struct UnbuiltXCFrameworkPackage {
 			defer {Config.fm.changeCurrentDirectoryPath(previousCwd)}
 			
 			/* TODO: Do not force unwrap here */
-			try Process.spawnAndStreamEnsuringSuccess("/usr/bin/zip", args: ["-r", buildPaths.resultXCFrameworkStaticArchive.string,  buildPaths.resultXCFrameworkStatic.lastComponent!.string],  outputHandler: Process.logProcessOutputFactory())
-			try Process.spawnAndStreamEnsuringSuccess("/usr/bin/zip", args: ["-r", buildPaths.resultXCFrameworkDynamicArchive.string, buildPaths.resultXCFrameworkDynamic.lastComponent!.string], outputHandler: Process.logProcessOutputFactory())
+			try Process.spawnAndStreamEnsuringSuccess("/usr/bin/zip", args: ["-r", "--symlinks", buildPaths.resultXCFrameworkStaticArchive.string,  buildPaths.resultXCFrameworkStatic.lastComponent!.string],  outputHandler: Process.logProcessOutputFactory())
+			try Process.spawnAndStreamEnsuringSuccess("/usr/bin/zip", args: ["-r", "--symlinks", buildPaths.resultXCFrameworkDynamicArchive.string, buildPaths.resultXCFrameworkDynamic.lastComponent!.string], outputHandler: Process.logProcessOutputFactory())
 		}
 		
 		/* Write the package once, without checksums */
