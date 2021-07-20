@@ -19,8 +19,8 @@ struct UnbuiltXCFrameworkPackage {
 		}
 		
 		/* Create the XCFramework archives */
-		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/ditto", args: ["-c", "-k", buildPaths.resultXCFrameworkStatic.string,  buildPaths.resultXCFrameworkStaticArchive.string],  outputHandler: Process.logProcessOutputFactory())
-		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/ditto", args: ["-c", "-k", buildPaths.resultXCFrameworkDynamic.string, buildPaths.resultXCFrameworkDynamicArchive.string], outputHandler: Process.logProcessOutputFactory())
+		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/ditto", args: ["-c", "-k", "--keepParent", buildPaths.resultXCFrameworkStatic.string,  buildPaths.resultXCFrameworkStaticArchive.string],  outputHandler: Process.logProcessOutputFactory())
+		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/ditto", args: ["-c", "-k", "--keepParent", buildPaths.resultXCFrameworkDynamic.string, buildPaths.resultXCFrameworkDynamicArchive.string], outputHandler: Process.logProcessOutputFactory())
 		
 		/* Write the package once, without checksums */
 		var checksums: [String: String?] = ["static": nil, "dynamic": nil]
