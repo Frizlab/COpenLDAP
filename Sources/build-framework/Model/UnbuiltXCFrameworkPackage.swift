@@ -19,22 +19,32 @@ struct UnbuiltXCFrameworkPackage {
 		}
 		
 		/* Create the XCFramework archives */
-		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/ditto", args: ["-c", "-k", "--keepParent", buildPaths.resultXCFrameworkStatic.string,  buildPaths.resultXCFrameworkStaticArchive.string],  outputHandler: Process.logProcessOutputFactory())
-		try Process.spawnAndStreamEnsuringSuccess("/usr/bin/ditto", args: ["-c", "-k", "--keepParent", buildPaths.resultXCFrameworkDynamic.string, buildPaths.resultXCFrameworkDynamicArchive.string], outputHandler: Process.logProcessOutputFactory())
+		do {
+			/* Change CWD, but should be done in Process calls below */
+			let previousCwd = Config.fm.currentDirectoryPath
+			Config.fm.changeCurrentDirectoryPath(buildPaths.resultPackageSwift.removingLastComponent().string)
+			defer {Config.fm.changeCurrentDirectoryPath(previousCwd)}
+			
+			/* TODO: Do not force unwrap here */
+			try Process.spawnAndStreamEnsuringSuccess("/usr/bin/zip", args: ["-r", buildPaths.resultXCFrameworkStaticArchive.string,  buildPaths.resultXCFrameworkStatic.lastComponent!.string],  outputHandler: Process.logProcessOutputFactory())
+			try Process.spawnAndStreamEnsuringSuccess("/usr/bin/zip", args: ["-r", buildPaths.resultXCFrameworkDynamicArchive.string, buildPaths.resultXCFrameworkDynamic.lastComponent!.string], outputHandler: Process.logProcessOutputFactory())
+		}
 		
 		/* Write the package once, without checksums */
 		var checksums: [String: String?] = ["static": nil, "dynamic": nil]
 		try packageFile(forVersion: nil, checksums: checksums)
 			.write(to: buildPaths.resultPackageSwift.url, atomically: true, encoding: .utf8)
 		
-		/* Change CWD, but should be done in Process calls below */
-		let previousCwd = Config.fm.currentDirectoryPath
-		Config.fm.changeCurrentDirectoryPath(buildPaths.resultPackageSwift.removingLastComponent().string)
-		defer {Config.fm.changeCurrentDirectoryPath(previousCwd)}
-		
-		/* Compute checksums */
-		checksums["static"]  = try Process.spawnAndGetOutput("/usr/bin/swift", args: ["package", "compute-checksum", buildPaths.resultXCFrameworkStaticArchive.string]).trimmingCharacters(in: .whitespacesAndNewlines)
-		checksums["dynamic"] = try Process.spawnAndGetOutput("/usr/bin/swift", args: ["package", "compute-checksum", buildPaths.resultXCFrameworkDynamicArchive.string]).trimmingCharacters(in: .whitespacesAndNewlines)
+		do {
+			/* Change CWD, but should be done in Process calls below */
+			let previousCwd = Config.fm.currentDirectoryPath
+			Config.fm.changeCurrentDirectoryPath(buildPaths.resultPackageSwift.removingLastComponent().string)
+			defer {Config.fm.changeCurrentDirectoryPath(previousCwd)}
+			
+			/* Compute checksums */
+			checksums["static"]  = try Process.spawnAndGetOutput("/usr/bin/swift", args: ["package", "compute-checksum", buildPaths.resultXCFrameworkStaticArchive.string]).trimmingCharacters(in: .whitespacesAndNewlines)
+			checksums["dynamic"] = try Process.spawnAndGetOutput("/usr/bin/swift", args: ["package", "compute-checksum", buildPaths.resultXCFrameworkDynamicArchive.string]).trimmingCharacters(in: .whitespacesAndNewlines)
+		}
 		
 		/* Rewrite Package.swift file for remote xcframework */
 		try packageFile(forVersion: openldapVersion, checksums: checksums)
