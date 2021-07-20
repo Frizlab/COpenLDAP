@@ -345,6 +345,12 @@ struct BuildFramework : ParsableCommand {
 			let unbuiltXCFramework = UnbuiltDynamicXCFramework(frameworks: frameworks, skipExistingArtifacts: skipExistingArtifacts)
 			try unbuiltXCFramework.buildXCFramework(at: buildPaths.resultXCFrameworkDynamic)
 		}
+		
+		/* Create the final XCFramework package (XCFramework archives and Package.swift file) */
+		do {
+			let unbuiltXCFrameworkPackage = UnbuiltXCFrameworkPackage(buildPaths: buildPaths, skipExistingArtifacts: skipExistingArtifacts)
+			try unbuiltXCFrameworkPackage.buildXCFrameworkPackage(openldapVersion: openldapVersion)
+		}
 	}
 	
 	private struct PlatformAndSdk : Hashable, CustomStringConvertible {

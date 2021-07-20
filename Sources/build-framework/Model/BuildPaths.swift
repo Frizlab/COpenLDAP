@@ -19,6 +19,10 @@ struct BuildPaths {
 	let resultXCFrameworkStatic: FilePath
 	let resultXCFrameworkDynamic: FilePath
 	
+	let resultPackageSwift: FilePath
+	let resultXCFrameworkStaticArchive: FilePath
+	let resultXCFrameworkDynamicArchive: FilePath
+	
 	let developerDir: FilePath
 	
 	let templatesDir: FilePath
@@ -112,6 +116,10 @@ struct BuildPaths {
 		self.resultXCFrameworkStatic  = self.resultDir.appending(staticXCFrameworkComponent)
 		self.resultXCFrameworkDynamic = self.resultDir.appending(dynamicXCFrameworkComponent)
 		
+		self.resultPackageSwift = self.resultDir.appending("Package.swift")
+		self.resultXCFrameworkStaticArchive  = self.resultDir.appending( staticXCFrameworkComponent.string + ".zip")
+		self.resultXCFrameworkDynamicArchive = self.resultDir.appending(dynamicXCFrameworkComponent.string + ".zip")
+		
 		self.sourcesDir  = self.buildDir.appending("step1.sources-and-builds")
 		self.installsDir = self.buildDir.appending("step2.installs")
 		
@@ -133,6 +141,10 @@ struct BuildPaths {
 		try Config.fm.ensureDirectoryDeleted(path: buildDir)
 		try Config.fm.ensureDirectoryDeleted(path: resultXCFrameworkStatic)
 		try Config.fm.ensureDirectoryDeleted(path: resultXCFrameworkDynamic)
+		
+		try Config.fm.ensureFileDeleted(path: resultPackageSwift)
+		try Config.fm.ensureFileDeleted(path: resultXCFrameworkStaticArchive)
+		try Config.fm.ensureFileDeleted(path: resultXCFrameworkDynamicArchive)
 	}
 	
 	func ensureAllDirectoriesExist() throws {
